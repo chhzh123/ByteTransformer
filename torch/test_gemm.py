@@ -7,10 +7,11 @@ import torch.nn.functional as F
 # c = a + b (shape: [n])
 M, N, K = 1024, 1024, 1024
 # M, N, K = 16, 16, 16
-a = torch.rand((M, K), dtype=torch.float16, device="cuda:0")
-b = torch.rand((K, N), dtype=torch.float16, device="cuda:0")
-bias = torch.rand((N,), dtype=torch.float16, device="cuda:0")
-cuda_c = torch.zeros((M, N), dtype=torch.float16, device="cuda:0")
+dtype = torch.float32
+a = torch.rand((M, K), dtype=dtype, device="cuda:0")
+b = torch.rand((K, N), dtype=dtype, device="cuda:0")
+bias = torch.rand((N,), dtype=dtype, device="cuda:0")
+cuda_c = torch.zeros((M, N), dtype=dtype, device="cuda:0")
 
 ntest = 100
 
@@ -33,13 +34,14 @@ def show_time(func):
 
 
 def run_cuda():
-    # torch.ops.bt.dense(a, b, cuda_c)
-    torch.ops.bt.gemm_bias_gelu(a, b, bias, cuda_c)
+    torch.ops.bt.dense(a, b, cuda_c)
     return cuda_c
+    # torch.ops.bt.gemm_bias_gelu(a, b, bias, cuda_c)
+    # return cuda_c
 
 
 def run_torch():
-    # c = torch.matmul(a, b)
+    return torch.matmul(a, b)
     c = F.linear(a, b.transpose(1, 0), bias)
     d = F.gelu(c)
     return d
@@ -52,7 +54,7 @@ if __name__ == "__main__":
     torch_res = run_torch()
     print(cuda_res)
     print(torch_res)
-    # torch.testing.assert_close(cuda_res, torch_res)
+    torch.testing.assert_close(cuda_res, torch_res)
     print("Kernel test passed.")
 
     print("Running cuda...")
