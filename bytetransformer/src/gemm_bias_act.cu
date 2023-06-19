@@ -147,17 +147,4 @@ void gemm_bias_gelu<__half>(const half *A_, const half *B_, half *C_, const half
   }
 }
 
-template <>
-void gemm_bias_relu<float>(const float *A_, const float *B_, float *C_, const float *bias_, int m_,
-                           int k_, int n_, cudaStream_t stream, cublasHandle_t cublas_handle,
-                           int cublasAlgo, int arch) {
-  dense_layer_kernel_launcher(A_, B_, C_, m_, k_, n_, cublas_handle, stream, cublasAlgo);
-  // add_bias_relu<<<m_, n_ / 4, 0, stream>>>(C_, bias_, m_, n_);
-}
-
-template <>
-void gemm_bias_relu<__half>(const half *A_, const half *B_, half *C_, const half *bias_, int m_,
-                            int k_, int n_, cudaStream_t stream, cublasHandle_t cublas_handle,
-                            int cublasAlgo, int arch) {
-}
 }  // namespace bytetransformer
