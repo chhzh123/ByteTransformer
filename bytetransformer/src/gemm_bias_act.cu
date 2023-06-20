@@ -62,7 +62,7 @@ void cublas_gemm_bias_gelu(const __half *A, const __half *B, __half *C, const __
                            int k, int n, cudaStream_t stream, cublasHandle_t cublas_handle,
                            int cublasAlgo) {
   dense_layer_kernel_launcher(A, B, C, m, k, n, cublas_handle, stream, cublasAlgo);
-  add_bias_gelu<<<m, n / 8, 0, stream>>>(C, bias, m, n);
+  add_bias_gelu<<<m, min(n / 8, 1024), 0, stream>>>(C, bias, m, n);
 }
 
 template <>
@@ -70,7 +70,7 @@ void gemm_bias_gelu<float>(const float *A_, const float *B_, float *C_, const fl
                            int k_, int n_, cudaStream_t stream, cublasHandle_t cublas_handle,
                            int cublasAlgo, int arch) {
   dense_layer_kernel_launcher(A_, B_, C_, m_, k_, n_, cublas_handle, stream, cublasAlgo);
-  add_bias_gelu<<<m_, n_ / 4, 0, stream>>>(C_, bias_, m_, n_);
+  add_bias_gelu<<<m_, min(n_ / 4, 1024), 0, stream>>>(C_, bias_, m_, n_);
 }
 
 template <>

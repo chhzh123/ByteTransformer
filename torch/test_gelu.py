@@ -4,14 +4,16 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-bs = 2
+bs = 1
 seq = 512
 hs = 1024
+# M = bs * seq
+# K = hs
+# N = hs * 3
 dtype = torch.float16
 a = torch.rand((bs, seq, hs), dtype=dtype, device="cuda:0")
-b = torch.rand((hs, hs * 3), dtype=dtype, device="cuda:0")
-bias = torch.rand((hs * 3,), dtype=dtype, device="cuda:0")
-cuda_c = torch.zeros((bs, seq, hs * 3), dtype=dtype, device="cuda:0")
+b = torch.rand((hs * 4, hs), dtype=dtype, device="cuda:0")
+bias = torch.rand((hs * 4,), dtype=dtype, device="cuda:0")
 
 ntest = 100
 
@@ -36,13 +38,14 @@ def show_time(func):
 def run_cuda():
     # torch.ops.bt.dense(a, b, cuda_c)
     # return cuda_c
+    cuda_c = torch.zeros((bs, seq, hs * 4), dtype=dtype, device="cuda:0")
     torch.ops.bt.gemm_bias_gelu(a, b, bias, cuda_c)
     return cuda_c
 
 
 def run_torch():
     # return torch.matmul(a, b)
-    c = F.linear(a, b.transpose(1, 0), bias)
+    c = F.linear(a, b, bias)
     d = F.gelu(c)
     return d
 
@@ -50,17 +53,18 @@ def run_torch():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     torch.ops.load_library("build/libbt.so")
-    cuda_res = run_cuda()
-    torch_res = run_torch()
-    print(cuda_res)
-    print(torch_res)
-    # torch.testing.assert_close(cuda_res, torch_res)
-    print("Kernel test passed.")
-
-    print("Running cuda...")
-    cuda_time, cuda_res = show_time(run_cuda)
-    print("Cuda time:  {:.3f}us".format(np.mean(cuda_time)))
 
     print("Running torch...")
     torch_time, torch_res = show_time(run_torch)
     print("Torch time:  {:.3f}us".format(np.mean(torch_time)))
+
+    print("Running cuda...")
+    # Need to prepare the weight in advance
+    b = b.transpose(1, 0).contiguous()
+    cuda_time, cuda_res = show_time(run_cuda)
+    print("Cuda time:  {:.3f}us".format(np.mean(cuda_time)))
+
+    print(cuda_res)
+    print(torch_res)
+    torch.testing.assert_close(cuda_res, torch_res)
+    print("Kernel test passed.")
