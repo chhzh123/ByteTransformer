@@ -44,4 +44,9 @@ void cublas_Gemm_Strided_Batched(const __half *A, const __half *B, __half *out, 
 template <typename T>
 void gemm_bias_gelu(const T *A_, const T *B_, T *C_, const T *bias_, int m_, int k_, int n_,
                     cudaStream_t stream, cublasHandle_t cublas_handle, int cublasAlgo, int arch);
+
+template <typename T>
+void add_bias_input_layernorm_kernel_launcher(T *output, const T *input, const T *bias,
+                                              const void *gamma, const void *beta, int m, int n,
+                                              int hidden_dim, cudaStream_t stream, bool use_fp32);
 }  // namespace bytetransformer

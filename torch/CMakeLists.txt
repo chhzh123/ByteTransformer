@@ -28,7 +28,12 @@ include_directories(../3rdparty/cutlass/include)
 include_directories(../3rdparty/cutlass/tools/util/include)
 include_directories(../cutlass_contrib/include)
 
-set(SRCS gemm_ops.cc ../bytetransformer/src/gemm.cu ../bytetransformer/src/gemm_bias_act.cu)
+set(SRCS
+  gemm_ops.cc
+  ../bytetransformer/src/gemm.cu
+  ../bytetransformer/src/gemm_bias_act.cu
+  ../bytetransformer/src/layernorm.cu
+)
 add_library(bt SHARED ${SRCS})
 
-target_link_libraries(bt "${TORCH_LIBRARIES}" "${TORCH_PYTHON_LIBRARY}")
+target_link_libraries(bt "${TORCH_LIBRARIES}" "${TORCH_PYTHON_LIBRARY}" -lcublas -lcudart)
