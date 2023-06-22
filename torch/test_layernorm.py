@@ -11,9 +11,10 @@ hs = 1024
 # M = bs * seq
 # K = hs
 # N = hs * 3
-dtype = torch.float32
+dtype = torch.float16
 hidden_states = torch.rand((bs, seq, hs), dtype=dtype, device="cuda:0")
 bias = torch.rand((hs,), dtype=dtype, device="cuda:0")
+
 
 class Model(nn.Module):
     def __init__(self):
@@ -23,8 +24,10 @@ class Model(nn.Module):
     def forward(self, hidden_states, bias):
         return self.ln_layer(hidden_states + bias)
 
+
 ntest = 100
-mod = Model()
+mod = Model().cuda().to(dtype)
+
 
 def show_time(func):
     times = list()
@@ -47,7 +50,9 @@ def run_cuda():
     # torch.ops.bt.dense(a, b, cuda_c)
     # return cuda_c
     cuda_c = torch.zeros((bs, seq, hs), dtype=dtype, device="cuda:0")
-    torch.ops.bt.add_bias_layernorm(hidden_states, bias, mod.ln_layer.weight, mod.ln_layer.bias, cuda_c, True)
+    torch.ops.bt.add_bias_layernorm(
+        hidden_states, bias, mod.ln_layer.weight, mod.ln_layer.bias, cuda_c
+    )
     return cuda_c
 
 

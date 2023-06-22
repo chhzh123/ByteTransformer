@@ -32,7 +32,7 @@ set(SRCS
   gemm_ops.cc
   ../bytetransformer/src/gemm.cu
   ../bytetransformer/src/gemm_bias_act.cu
-  ../bytetransformer/src/layernorm.cu
+  ../bytetransformer/src/ln.cu
 )
 add_library(bt SHARED ${SRCS})
 

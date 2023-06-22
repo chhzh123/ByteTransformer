@@ -29,18 +29,6 @@ void dense_layer_kernel_launcher(const __half *in, const __half *weight, __half 
                                  const int K, const int N, cublasHandle_t cublas_handle,
                                  cudaStream_t stream, int cublasAlgo = 99);
 
-void cublas_Gemm_Strided_Batched(const float *A, const float *B, float *out, const int M,
-                                 const int K, const int N, const int batch_count,
-                                 cublasOperation_t trans_A, cublasOperation_t trans_B, float alpha,
-                                 float beta, cublasHandle_t cublas_handle, cudaStream_t stream,
-                                 int cublasAlgo = -1);
-
-void cublas_Gemm_Strided_Batched(const __half *A, const __half *B, __half *out, const int M,
-                                 const int K, const int N, const int batch_count,
-                                 cublasOperation_t trans_A, cublasOperation_t trans_B,
-                                 __half alpha, __half beta, cublasHandle_t cublas_handle,
-                                 cudaStream_t stream, int cublasAlgo = 99);
-
 template <typename T>
 void gemm_bias_gelu(const T *A_, const T *B_, T *C_, const T *bias_, int m_, int k_, int n_,
                     cudaStream_t stream, cublasHandle_t cublas_handle, int cublasAlgo, int arch);

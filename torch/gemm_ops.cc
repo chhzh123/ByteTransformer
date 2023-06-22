@@ -45,8 +45,8 @@ void gemm_bias_gelu(const torch::Tensor &in, const torch::Tensor &weight, torch:
 }
 
 void add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &bias,
-                        const torch::Tensor &gamma, const torch::Tensor &beta, torch::Tensor &out,
-                        bool use_fp32) {
+                        const torch::Tensor &gamma, const torch::Tensor &beta,
+                        torch::Tensor &out) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
   int n_dim = in.dim();
   int M = 1;
@@ -56,16 +56,16 @@ void add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &bias,
   if (in.dtype() == torch::kFloat16) {
     // see bert_transformer.cu
     int hidden_dim = N / 2;
-    bytetransformer::add_bias_input_layernorm_kernel_launcher<__half>(
+    bytetransformer::add_bias_input_layernorm_kernel_launcher(
         (__half *)out.data_ptr(), (const __half *)in.data_ptr(), (const __half *)bias.data_ptr(),
         (const void *)gamma.data_ptr(), (const void *)beta.data_ptr(), M, N, hidden_dim, stream,
-        use_fp32);
+        false);
   } else {
     int hidden_dim = N;
-    bytetransformer::add_bias_input_layernorm_kernel_launcher<float>(
+    bytetransformer::add_bias_input_layernorm_kernel_launcher(
         (float *)out.data_ptr(), (const float *)in.data_ptr(), (const float *)bias.data_ptr(),
         (const void *)gamma.data_ptr(), (const void *)beta.data_ptr(), M, N, hidden_dim, stream,
-        use_fp32);
+        true);
   }
 }
 
