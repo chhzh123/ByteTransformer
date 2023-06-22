@@ -2,9 +2,10 @@
 #include "ATen/cuda/CUDAContext.h"
 #include "bt.h"
 
-void dense(const torch::Tensor &in, const torch::Tensor &weight, torch::Tensor &out) {
+torch::Tensor dense(const torch::Tensor &in, const torch::Tensor &weight) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
   cublasHandle_t cublas_handle = at::cuda::getCurrentCUDABlasHandle();
+  auto out = torch::empty({in.size(0), weight.size(1)}, in.options());
   int n_dim = in.dim();
   int M = 1;
   for (int i = 0; i < n_dim - 1; ++i)
@@ -21,6 +22,7 @@ void dense(const torch::Tensor &in, const torch::Tensor &weight, torch::Tensor &
         (const float *)in.data_ptr(), (const float *)weight.data_ptr(), (float *)out.data_ptr(), M,
         K, N, cublas_handle, stream);
   }
+  return out;
 }
 
 void gemm_bias_gelu(const torch::Tensor &in, const torch::Tensor &weight, torch::Tensor &bias,
