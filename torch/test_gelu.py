@@ -36,15 +36,10 @@ def show_time(func):
 
 
 def run_cuda():
-    # torch.ops.bt.dense(a, b, cuda_c)
-    # return cuda_c
-    cuda_c = torch.zeros((bs, seq, hs * 4), dtype=dtype, device="cuda:0")
-    torch.ops.bt.gemm_bias_gelu(a, b, bias, cuda_c)
-    return cuda_c
+    return torch.ops.bt.gemm_bias_gelu(a, b, bias)
 
 
 def run_torch():
-    # return torch.matmul(a, b)
     c = F.linear(a, b, bias)
     d = F.gelu(c)
     return d

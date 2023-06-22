@@ -47,13 +47,9 @@ def show_time(func):
 
 
 def run_cuda():
-    # torch.ops.bt.dense(a, b, cuda_c)
-    # return cuda_c
-    cuda_c = torch.zeros((bs, seq, hs), dtype=dtype, device="cuda:0")
-    torch.ops.bt.add_bias_layernorm(
-        hidden_states, bias, mod.ln_layer.weight, mod.ln_layer.bias, cuda_c
+    return torch.ops.bt.add_bias_layernorm(
+        hidden_states, bias, mod.ln_layer.weight, mod.ln_layer.bias
     )
-    return cuda_c
 
 
 def run_torch():

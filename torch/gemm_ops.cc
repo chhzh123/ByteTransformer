@@ -25,10 +25,13 @@ torch::Tensor dense(const torch::Tensor &in, const torch::Tensor &weight) {
   return out;
 }
 
-void gemm_bias_gelu(const torch::Tensor &in, const torch::Tensor &weight, torch::Tensor &bias,
-                    torch::Tensor &out) {
+torch::Tensor gemm_bias_gelu(const torch::Tensor &in, const torch::Tensor &weight,
+                             const torch::Tensor &bias) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
   cublasHandle_t cublas_handle = at::cuda::getCurrentCUDABlasHandle();
+  std::vector<int64_t> out_size = in.sizes().vec();
+  out_size[out_size.size() - 1] = weight.size(1);
+  auto out = torch::empty(out_size, in.options());
   int n_dim = in.dim();
   int M = 1;
   for (int i = 0; i < n_dim - 1; ++i)
@@ -44,12 +47,13 @@ void gemm_bias_gelu(const torch::Tensor &in, const torch::Tensor &weight, torch:
                                     (float *)out.data_ptr(), (const float *)bias.data_ptr(), M, K,
                                     N, stream, cublas_handle, -1 /*float algo*/, 70);
   }
+  return out;
 }
 
-void add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &bias,
-                        const torch::Tensor &gamma, const torch::Tensor &beta,
-                        torch::Tensor &out) {
+torch::Tensor add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &bias,
+                                 const torch::Tensor &gamma, const torch::Tensor &beta) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
+  auto out = torch::zeros_like(in);
   int n_dim = in.dim();
   int M = 1;
   for (int i = 0; i < n_dim - 1; ++i)
@@ -69,6 +73,7 @@ void add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &bias,
         (const void *)gamma.data_ptr(), (const void *)beta.data_ptr(), M, N, hidden_dim, stream,
         true);
   }
+  return out;
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
