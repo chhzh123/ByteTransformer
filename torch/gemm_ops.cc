@@ -76,7 +76,7 @@ torch::Tensor add_bias_layernorm(const torch::Tensor &in, const torch::Tensor &b
   return out;
 }
 
-torch::Tensor add_residual_bias_layernorm(torch::Tensor &in, const torch::Tensor &residual,
+torch::Tensor add_bias_residual_layernorm(torch::Tensor &in, const torch::Tensor &residual,
                                           const torch::Tensor &bias, const torch::Tensor &gamma,
                                           const torch::Tensor &beta) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
@@ -107,7 +107,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("dense", &dense, "BT dense warpper");
   m.def("gemm_bias_gelu", &gemm_bias_gelu, "BT gemm bias gelu warpper");
   m.def("add_bias_layernorm", &add_bias_layernorm, "BT add bias layernorm warpper");
-  m.def("add_residual_bias_layernorm", &add_residual_bias_layernorm,
+  m.def("add_bias_residual_layernorm", &add_bias_residual_layernorm,
         "BT add residual bias layernorm warpper");
 }
 
@@ -115,5 +115,5 @@ TORCH_LIBRARY(bt, m) {
   m.def("dense", dense);
   m.def("gemm_bias_gelu", gemm_bias_gelu);
   m.def("add_bias_layernorm", add_bias_layernorm);
-  m.def("add_residual_bias_layernorm", add_residual_bias_layernorm);
+  m.def("add_bias_residual_layernorm", add_bias_residual_layernorm);
 }
