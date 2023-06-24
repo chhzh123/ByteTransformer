@@ -37,4 +37,10 @@ template <typename T>
 void add_bias_input_layernorm_kernel_launcher(T *output, const T *input, const T *bias,
                                               const void *gamma, const void *beta, int m, int n,
                                               int hidden_dim, cudaStream_t stream, bool use_fp32);
+
+template <typename T>
+void add_bias_input_out_layernorm_kernel_launcher(T *output, const T *input, const T *bias,
+                                                  T *output2, const void *gamma, const void *beta,
+                                                  int m, int n, int hidden_dim,
+                                                  cudaStream_t stream, bool use_fp32);
 }  // namespace bytetransformer

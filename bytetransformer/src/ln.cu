@@ -177,8 +177,8 @@ __global__ void add_bias_input_layernorm_v2(__half *out, const __half *input, co
 }
 
 __global__ void add_bias_input_layernorm(float *out, const float *input, const float *bias,
-                                                const void *gamma, const void *beta, int n,
-                                                bool use_fp32) {
+                                         const void *gamma, const void *beta, int n,
+                                         bool use_fp32) {
   int offset = blockIdx.x * n + threadIdx.x;
 
   float local_out = (float)(out[offset] + __ldg(&input[offset]) + __ldg(&bias[threadIdx.x]));
@@ -187,9 +187,9 @@ __global__ void add_bias_input_layernorm(float *out, const float *input, const f
   layernorm(local_out, gamma, beta, out + offset, n, s_);
 }
 
-__global__ void add_bias_input_layernorm(__half *out, const __half *input,
-                                                 const __half *bias, const void *gamma,
-                                                 const void *beta, int n, bool use_fp32) {
+__global__ void add_bias_input_layernorm(__half *out, const __half *input, const __half *bias,
+                                         const void *gamma, const void *beta, int n,
+                                         bool use_fp32) {
   int offset = blockIdx.x * n / 2 + threadIdx.x;
 
   half2 local_out((__half)0.0f, (__half)0.0f);
@@ -202,9 +202,11 @@ __global__ void add_bias_input_layernorm(__half *out, const __half *input,
 }
 
 template <>
-void add_bias_input_layernorm_kernel_launcher<float>(float *output, const float *input, const float *bias,
-                                              const void *gamma, const void *beta, int m, int n,
-                                              int hidden_dim, cudaStream_t stream, bool use_fp32) {
+void add_bias_input_layernorm_kernel_launcher<float>(float *output, const float *input,
+                                                     const float *bias, const void *gamma,
+                                                     const void *beta, int m, int n,
+                                                     int hidden_dim, cudaStream_t stream,
+                                                     bool use_fp32) {
   dim3 grid(m), block(hidden_dim);
   if (m >= 80 && n % 128 == 0) {
     if (n % 256 != 0)
@@ -222,9 +224,11 @@ void add_bias_input_layernorm_kernel_launcher<float>(float *output, const float 
 }
 
 template <>
-void add_bias_input_layernorm_kernel_launcher<__half>(__half *output, const __half *input, const __half *bias,
-                                              const void *gamma, const void *beta, int m, int n,
-                                              int hidden_dim, cudaStream_t stream, bool use_fp32) {
+void add_bias_input_layernorm_kernel_launcher<__half>(__half *output, const __half *input,
+                                                      const __half *bias, const void *gamma,
+                                                      const void *beta, int m, int n,
+                                                      int hidden_dim, cudaStream_t stream,
+                                                      bool use_fp32) {
   dim3 grid(m), block(hidden_dim);
   if (m >= 80 && n % 128 == 0) {
     if (n % 256 != 0)
@@ -241,4 +245,126 @@ void add_bias_input_layernorm_kernel_launcher<__half>(__half *output, const __ha
   }
 }
 
-} // namespace bytetransformer
+template <typename T>
+__global__ void add_bias_input_out_layernorm(T *out, const T *input, const T *bias, T *out2,
+                                             const void *gamma, const void *beta, int n,
+                                             bool use_fp32);
+
+template <>
+__global__ void add_bias_input_out_layernorm<float>(float *out, const float *input,
+                                                    const float *bias, float *out2,
+                                                    const void *gamma, const void *beta, int n,
+                                                    bool use_fp32) {
+  int offset = blockIdx.x * n + threadIdx.x;
+
+  float local_out = out[offset] + __ldg(&input[offset]) + __ldg(&bias[threadIdx.x]);
+  out2[offset] = local_out;
+
+  __shared__ float s_[2];
+  layernorm(local_out, gamma, beta, out + offset, n, s_);
+}
+
+template <const int ite>
+__global__ void add_bias_input_out_layernorm_v2(float *out, const float *input, const float *bias,
+                                                float *out2, const void *gamma, const void *beta,
+                                                int n, bool use_fp32) {
+  int offset = blockIdx.x * n;
+
+  float local_out[ite];
+  float sum = 0.0f;
+#pragma unroll
+  for (int i = 0; i < ite; i++) {
+    int col_id = i * blockDim.x + threadIdx.x;
+    int id = offset + col_id;
+    local_out[i] = out[id] + __ldg(&input[id]) + __ldg(&bias[col_id]);
+    out2[id] = local_out[i];
+    sum += local_out[i];
+  }
+
+  __shared__ float s_[2];
+  layernorm_v2<ite>(local_out, sum, gamma, beta, out + offset, n, s_);
+}
+
+template <>
+__global__ void add_bias_input_out_layernorm<__half>(__half *out, const __half *input,
+                                                     const __half *bias, __half *out2,
+                                                     const void *gamma, const void *beta, int n,
+                                                     bool use_fp32) {
+  int offset = blockIdx.x * n / 2 + threadIdx.x;
+
+  half2 local_out =
+      __hadd2(__hadd2(((half2 *)out)[offset], __ldg(&((const half2 *)input)[offset])),
+              __ldg(&((const half2 *)bias)[threadIdx.x]));
+  ((half2 *)out2)[offset] = local_out;
+
+  __shared__ float s_[2];
+  layernorm(local_out, gamma, beta, ((half2 *)out) + offset, n, s_, use_fp32);
+}
+
+template <const int ite>
+__global__ void add_bias_input_out_layernorm_v2(__half *out, const __half *input,
+                                                const __half *bias, __half *out2,
+                                                const void *gamma, const void *beta, int n,
+                                                bool use_fp32) {
+  half2 *out_ptr = (half2 *)out;
+  const half2 *input_ptr = (const half2 *)input;
+  const half2 *bias_ptr = (const half2 *)bias;
+  half2 *out2_ptr = (half2 *)out2;
+
+  int offset = blockIdx.x * n / 2;
+
+  float2 local_out_fp2[ite];
+  float sum = 0.0f;
+#pragma unroll
+  for (int i = 0; i < ite; i++) {
+    int col_id = i * blockDim.x + threadIdx.x;
+    int id = offset + col_id;
+    half2 temp = __hadd2(__hadd2(out_ptr[id], __ldg(&input_ptr[id])), __ldg(&bias_ptr[col_id]));
+    out2_ptr[id] = temp;
+    local_out_fp2[i] = __half22float2(temp);
+    sum += local_out_fp2[i].x + local_out_fp2[i].y;
+  }
+
+  __shared__ float s_[2];
+  layernorm_v2<ite>(local_out_fp2, sum, gamma, beta, ((half2 *)out) + offset, n, s_, use_fp32);
+}
+
+template <>
+void add_bias_input_out_layernorm_kernel_launcher<__half>(__half *output, const __half *input,
+                                                          const __half *bias, __half *output2,
+                                                          const void *gamma, const void *beta,
+                                                          int m, int n, int hidden_dim,
+                                                          cudaStream_t stream, bool use_fp32) {
+  dim3 grid(m), block(hidden_dim);
+  if (m >= 80 && n % 128 == 0) {
+    if (n % 256 != 0)
+      add_bias_input_out_layernorm_v2<2><<<grid, block.x / 2, 0, stream>>>(
+          output, input, bias, output2, gamma, beta, n, use_fp32);
+    else
+      add_bias_input_out_layernorm_v2<4><<<grid, block.x / 4, 0, stream>>>(
+          output, input, bias, output2, gamma, beta, n, use_fp32);
+  } else
+    add_bias_input_out_layernorm<<<grid, block, 0, stream>>>(output, input, bias, output2, gamma,
+                                                             beta, n, use_fp32);
+}
+
+template <>
+void add_bias_input_out_layernorm_kernel_launcher<float>(float *output, const float *input,
+                                                         const float *bias, float *output2,
+                                                         const void *gamma, const void *beta,
+                                                         int m, int n, int hidden_dim,
+                                                         cudaStream_t stream, bool use_fp32) {
+  dim3 grid(m), block(hidden_dim);
+  if (m >= 80 && n % 128 == 0) {
+    if (n % 256 != 0)
+      add_bias_input_out_layernorm_v2<2><<<grid, block.x / 2, 0, stream>>>(
+          output, input, bias, output2, gamma, beta, n, use_fp32);
+    else
+      add_bias_input_out_layernorm_v2<4><<<grid, block.x / 4, 0, stream>>>(
+          output, input, bias, output2, gamma, beta, n, use_fp32);
+  } else
+    add_bias_input_out_layernorm<<<grid, block, 0, stream>>>(output, input, bias, output2, gamma,
+                                                             beta, n, use_fp32);
+}
+
+}  // namespace bytetransformer
