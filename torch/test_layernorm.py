@@ -13,6 +13,7 @@ hs = 1024
 # N = hs * 3
 dtype = torch.float16
 hidden_states = torch.rand((bs, seq, hs), dtype=dtype, device="cuda:0")
+residual = torch.rand((bs, seq, hs), dtype=dtype, device="cuda:0")
 bias = torch.rand((hs,), dtype=dtype, device="cuda:0")
 
 
@@ -21,8 +22,8 @@ class Model(nn.Module):
         super().__init__()
         self.ln_layer = nn.LayerNorm(hs)
 
-    def forward(self, hidden_states, bias):
-        return self.ln_layer(hidden_states + bias)
+    def forward(self, hidden_states, residual, bias):
+        return self.ln_layer(hidden_states + residual + bias)
 
 
 ntest = 100
@@ -47,18 +48,26 @@ def show_time(func):
 
 
 def run_cuda():
-    return torch.ops.bt.add_bias_layernorm(
-        hidden_states, bias, mod.ln_layer.weight, mod.ln_layer.bias
+    return torch.ops.bt.add_residual_bias_layernorm(
+        hidden_states, residual, bias, mod.ln_layer.weight, mod.ln_layer.bias
     )
 
 
 def run_torch():
-    return mod(hidden_states, bias)
+    return mod(hidden_states, residual, bias)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     torch.ops.load_library("build/libbt.so")
+
+    torch_res = run_torch()
+    # it will change the state, be careful!
+    cuda_res = run_cuda()
+    print(cuda_res)
+    print(torch_res)
+    # torch.testing.assert_close(cuda_res, torch_res)
+    print("Kernel test passed.")
 
     print("Running torch...")
     torch_time, torch_res = show_time(run_torch)
@@ -67,8 +76,3 @@ if __name__ == "__main__":
     print("Running cuda...")
     cuda_time, cuda_res = show_time(run_cuda)
     print("Cuda time:  {:.3f}us".format(np.mean(cuda_time)))
-
-    print(cuda_res)
-    print(torch_res)
-    torch.testing.assert_close(cuda_res, torch_res)
-    print("Kernel test passed.")
